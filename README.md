@@ -1,9 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>SECURITY QUIZ</title>
 
     <style>
@@ -47,25 +47,18 @@
         }
 
         @keyframes rotation {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(360deg);
-            }
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 
 <body>
-
     <div class="container">
         <div class="gear">⚙️</div>
-
         <h1>SECURITY QUIZ</h1>
-        <p>En développement</p>
+        <p>Site en cours de préparation...</p>
     </div>
-
 </body>
 </html>
+
