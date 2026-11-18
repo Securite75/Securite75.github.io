@@ -80,7 +80,6 @@ button.sel{background:var(--acc);color:#001018;border-color:var(--acc);font-weig
 
 <div id="modal" class="modal hidden"><div class="box" id="box"></div></div>
 
-<script src="questions.js"></script>
 <script>
 /* ============ THÈMES ============ */
 const THEMES = [
@@ -93,7 +92,33 @@ const THEMES = [
 const PCOLORS = ['#ffd54f','#f48fb1','#ffab40','#b39ddb'];
 const TIMES = {1:45, 2:40, 3:30};
 
-/* QUESTIONS est défini dans questions.js */
+/* ============ BANQUE DE QUESTIONS ============
+   Thèmes : pompier, police, armee, gendarm, prive — Niveaux : 1, 2, 3
+   Format : {q:"Question ?", answer:"Bonne réponse", alt:["Variante 1","Variante 2"]}
+   (alt est facultatif). La réponse tapée est validée à partir de 80 % de ressemblance
+   avec "answer" ou l'une des "alt" (accents / majuscules / ponctuation ignorés).
+   Un niveau vide utilise une question de test. */
+const QUESTIONS = {
+  pompier: { 1: [], 2: [], 3: [] },
+  police:  { 1: [], 2: [], 3: [] },
+  armee:   { 1: [], 2: [], 3: [] },
+  gendarm: {
+    1: [
+      {q:"Combien y a-t-il d'escadrons dans la gendarmerie mobile ?",
+       answer:"109", alt:["109 escadrons"]}
+    ],
+    2: [
+      {q:"Où est stationnée la gendarmerie mobile ?",
+       answer:"En caserne", alt:["Casernes","Encasernée","Encasernement","En garnison","Dans des casernes"]}
+    ],
+    3: [
+      {q:"Quelle est la composition et la chaîne de commandement d'un escadron de gendarmerie mobile ?",
+       answer:"1 peloton de soutien et 4 pelotons opérationnels, sous les ordres du commandant d'escadron, rattaché à un groupement puis à la région de gendarmerie",
+       alt:["1 peloton de soutien et 4 pelotons opérationnels","4 pelotons opérationnels et 1 peloton de soutien","Commandant d'escadron, groupement de gendarmerie mobile, région de gendarmerie"]}
+    ]
+  },
+  prive:   { 1: [], 2: [], 3: [] }
+};
 
 const used = new Set();
 function getQuestion(theme, level){
@@ -201,14 +226,14 @@ function ask(i,level){
   show(`<span class="theme" style="background:${t.color}">${t.icon} ${t.name.toUpperCase()} · Niveau ${level}</span>
     <div class="bar"><i id="tb"></i></div>
     <div class="q">${esc(q.q)}</div>
-    <form id="af"><input type="text" id="ans" autocomplete="off" placeholder="Tape ta réponse ici…">
-    <button class="primary" type="submit" style="margin-top:6px">VALIDER</button></form>
+    <div id="af"><input type="text" id="ans" autocomplete="off" placeholder="Tape ta réponse ici…">
+    <button class="primary" id="vb" type="button" style="margin-top:6px">VALIDER</button></div>
     <div class="fb" id="fb"></div>`);
   const inp=document.getElementById('ans'); inp.focus();
   const finish=(text)=>{
     if(done)return; done=true; clearInterval(timer);
     const ok=text!==null && isCorrect(text,q);
-    inp.disabled=true; document.querySelector('#af button').classList.add('hidden');
+    inp.disabled=true; document.getElementById('vb').classList.add('hidden');
     const fb=document.getElementById('fb');
     if(ok){
       players[current].score+=level; cells[i].owner=current; remaining--;
@@ -222,7 +247,8 @@ function ask(i,level){
     box.appendChild(nx);
     renderBoard(); renderScores();
   };
-  document.getElementById('af').onsubmit=e=>{e.preventDefault(); finish(inp.value)};
+  document.getElementById('vb').onclick=()=>finish(inp.value);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();finish(inp.value)}});
   timer=setInterval(()=>{left--; document.getElementById('tb').style.width=(left/total*100)+'%'; if(left<=0)finish(null)},1000);
 }
 
