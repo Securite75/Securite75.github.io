@@ -59,7 +59,7 @@ button.sel{background:var(--acc);color:#001018;border-color:var(--acc);font-weig
     <div class="row" id="nbBtns"></div>
     <div id="names"></div>
     <div class="legend" id="legend"></div>
-    <p class="note">Choisis une case, puis un niveau (1 facile → 3 très difficile). Bonne réponse = la case est à toi et tu gagnes 1, 2 ou 3 points.</p>
+    <p class="note">Choisis une case, puis un niveau (1 facile → 3 très difficile). Tape ta réponse : si elle ressemble à au moins 80 % à la bonne, la case est à toi (1, 2 ou 3 points).</p>
     <button class="primary" id="start">JOUER</button>
   </div>
 
@@ -80,6 +80,7 @@ button.sel{background:var(--acc);color:#001018;border-color:var(--acc);font-weig
 
 <div id="modal" class="modal hidden"><div class="box" id="box"></div></div>
 
+<script src="questions.js"></script>
 <script>
 /* ============ THÈMES ============ */
 const THEMES = [
@@ -90,14 +91,9 @@ const THEMES = [
   {id:'prive',   name:'Sécurité privée',   color:'#111111', icon:'🕶️'},
 ];
 const PCOLORS = ['#ffd54f','#f48fb1','#ffab40','#b39ddb'];
-const TIMES = {1:30, 2:25, 3:20};
+const TIMES = {1:45, 2:40, 3:30};
 
-/* ============ BANQUE DE QUESTIONS (À REMPLIR) ============
-   Format : QUESTIONS.pompier[1] = [ {q:"Question ?", options:["A","B","C","D"], answer:0}, ... ]
-   answer = index de la bonne réponse (0 à 3). Niveaux : 1, 2, 3.
-   Tant qu'un niveau est vide, une question de test est générée automatiquement. */
-const QUESTIONS = {};
-THEMES.forEach(t => QUESTIONS[t.id] = {1:[],2:[],3:[]});
+/* QUESTIONS est défini dans questions.js */
 
 const used = new Set();
 function getQuestion(theme, level){
@@ -109,9 +105,7 @@ function getQuestion(theme, level){
     return all[idx];
   }
   // Question de test (placeholder)
-  const opts = ['Réponse A','Réponse B','Réponse C','Réponse D'];
-  return {q:`[Question de test] ${theme.name} – niveau ${level}. Choisis « Réponse ${'ABCD'[0]} » (bonne réponse).`,
-          options:opts, answer:0, placeholder:true};
+  return {q:`[Question de test] ${theme.name} – niveau ${level}. Tape « test » pour valider.`, answer:'test', placeholder:true};
 }
 
 /* ============ ÉTAT ============ */
@@ -180,38 +174,56 @@ function chooseLevel(i){
     <button style="margin-top:14px" onclick="hide()">Annuler</button>`);
 }
 
+/* ============ VÉRIFICATION DE LA RÉPONSE (≥ 80 % de ressemblance) ============ */
+const THRESHOLD = 0.8;
+function norm(s){
+  return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function similarity(a,b){
+  a=norm(a); b=norm(b);
+  if(!a&&!b)return 1; if(!a||!b)return 0;
+  const m=a.length,n=b.length; let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){
+    const cur=[i];
+    for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev=cur;
+  }
+  return 1-prev[n]/Math.max(m,n);
+}
+function isCorrect(input,q){
+  return [].concat(q.answer, q.alt||[]).some(r=>similarity(input,r)>=THRESHOLD);
+}
+
 function ask(i,level){
   const t=cells[i].theme, q=getQuestion(t,level);
-  // mélange les réponses
-  const order=q.options.map((_,k)=>k).sort(()=>Math.random()-.5);
-  let left=TIMES[level], done=false;
+  let left=TIMES[level], done=false; const total=left;
   show(`<span class="theme" style="background:${t.color}">${t.icon} ${t.name.toUpperCase()} · Niveau ${level}</span>
     <div class="bar"><i id="tb"></i></div>
     <div class="q">${esc(q.q)}</div>
-    <div class="opts" id="opts">${order.map(k=>`<button data-k="${k}">${esc(q.options[k])}</button>`).join('')}</div>
+    <form id="af"><input type="text" id="ans" autocomplete="off" placeholder="Tape ta réponse ici…">
+    <button class="primary" type="submit" style="margin-top:6px">VALIDER</button></form>
     <div class="fb" id="fb"></div>`);
-  const finish=(chosen)=>{
+  const inp=document.getElementById('ans'); inp.focus();
+  const finish=(text)=>{
     if(done)return; done=true; clearInterval(timer);
-    const ok=chosen===q.answer;
-    document.querySelectorAll('#opts button').forEach(b=>{
-      b.disabled=true; const k=+b.dataset.k;
-      if(k===q.answer)b.classList.add('ok'); else if(k===chosen)b.classList.add('ko');
-    });
+    const ok=text!==null && isCorrect(text,q);
+    inp.disabled=true; document.querySelector('#af button').classList.add('hidden');
     const fb=document.getElementById('fb');
     if(ok){
       players[current].score+=level; cells[i].owner=current; remaining--;
       fb.style.color='#4cff88'; fb.textContent=`✅ Bonne réponse ! +${level} pt(s), la case est à toi.`;
     }else{
-      fb.style.color='#ff6b6b'; fb.textContent=chosen===-1?'⏱️ Temps écoulé !':'❌ Mauvaise réponse.';
+      fb.style.color='#ff6b6b';
+      fb.innerHTML=`${text===null?'⏱️ Temps écoulé !':'❌ Raté.'}<br><span style="color:var(--txt);font-weight:400">Réponse attendue : ${esc(String(q.answer))}</span>`;
     }
     const nx=document.createElement('button'); nx.className='primary'; nx.textContent='CONTINUER';
     nx.onclick=()=>{hide(); if(remaining===0){endGame();return} current=(current+1)%players.length; renderBoard(); renderScores()};
     box.appendChild(nx);
     renderBoard(); renderScores();
   };
-  document.querySelectorAll('#opts button').forEach(b=>b.onclick=()=>finish(+b.dataset.k));
-  const total=left;
-  timer=setInterval(()=>{left--; document.getElementById('tb').style.width=(left/total*100)+'%'; if(left<=0)finish(-1)},1000);
+  document.getElementById('af').onsubmit=e=>{e.preventDefault(); finish(inp.value)};
+  timer=setInterval(()=>{left--; document.getElementById('tb').style.width=(left/total*100)+'%'; if(left<=0)finish(null)},1000);
 }
 
 /* ============ FIN ============ */
